@@ -15,7 +15,23 @@
       </v-card-title>
       
       <v-card-text>
-        <v-list lines="two" class="mb-4">
+        <!-- 加载状态 -->
+        <div v-if="loading" class="text-center py-8">
+          <v-progress-circular indeterminate color="primary"></v-progress-circular>
+          <div class="mt-2">正在获取站点列表...</div>
+        </div>
+        
+        <!-- 错误提示 -->
+        <v-alert
+          v-if="error"
+          type="error"
+          class="mb-4"
+        >
+          {{ error }}
+        </v-alert>
+        
+        <!-- 站点列表 -->
+        <v-list v-if="!loading && !error && mirrors.length > 0" lines="two" class="mb-4">
           <v-list-subheader class="text-h6">
             <span>镜像站点</span>
           </v-list-subheader>
@@ -49,7 +65,11 @@
           </v-list-item>
         </v-list>
         
-
+        <!-- 空状态提示 -->
+        <div v-if="!loading && !error && mirrors.length === 0" class="text-center py-8">
+          <v-icon size="48" color="grey">mdi-server-off</v-icon>
+          <div class="mt-2 text-grey">暂无可用站点</div>
+        </div>
         
         <v-divider class="my-4" />
         
@@ -59,10 +79,23 @@
             size="x-large" 
             @click="$router.push('/use')"
             prepend-icon="mdi-play"
-            class="mb-2"
+            class="mb-2 mr-2"
+            :disabled="mirrors.length === 0"
           >
             开始使用
           </v-btn>
+          
+          <v-btn 
+            color="secondary" 
+            size="x-large" 
+            @click="refreshData"
+            prepend-icon="mdi-refresh"
+            class="mb-2"
+            :loading="loading"
+          >
+            刷新
+          </v-btn>
+          
           <div class="text-caption text-grey">点击开始使用按钮进入镜像资源管理页面</div>
         </div>
       </v-card-text>
@@ -74,26 +107,68 @@
 import { ref, computed, onMounted } from 'vue'
 
 // 镜像站点数据
-const mirrors = ref([
-  {
-    id: 1,
-    name: '主站',
-    url: 'https://resource.yearnstudio.cn',
-    latency: null
-  },
-  {
-    id: 2,
-    name: '厚浪云镜像',
-    url: 'https://yearnstudio.cdn.houlang.cloud',
-    latency: null
-  },
-  {
-    id: 3,
-    name: 'EdgeOne国际版',
-    url: 'https://list.yearnstudio.cn',
-    latency: null
+const mirrors = ref([])
+const loading = ref(false)
+const error = ref('')
+
+// 获取镜像站点列表
+const fetchMirrorList = async () => {
+  loading.value = true
+  error.value = ''
+  
+  try {
+    // 确定API端点
+    const isLocalhost = window.location.hostname === 'localhost'
+    const apiEndpoint = isLocalhost 
+      ? 'http://localhost:27645/api/list' 
+      : 'https://api.mirror.yearnstudio.cn/api/list'
+    
+    // 发起API请求
+    const response = await fetch(apiEndpoint, { 
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      cache: 'no-cache' // 不使用缓存
+    })
+    
+    // 检查响应状态
+    if (!response.ok) {
+      // 处理特定的HTTP状态码
+      if (response.status === 400) {
+        throw new Error('请求参数错误')
+      } else if (response.status === 404) {
+        throw new Error('API端点未找到')
+      } else if (response.status === 500) {
+        throw new Error('服务器内部错误')
+      } else {
+        throw new Error(`API请求失败: ${response.status}`)
+      }
+    }
+    
+    // 获取响应数据
+    const data = await response.json()
+    
+    // 处理响应数据
+    if (data && Array.isArray(data)) {
+      // 为每个站点添加id和latency字段
+      mirrors.value = data.map((item, index) => ({
+        id: index + 1,
+        name: item.name || '未命名站点',
+        url: item.url,
+        latency: null
+      }))
+    } else {
+      throw new Error('响应数据格式不正确')
+    }
+    
+  } catch (err) {
+    error.value = '获取站点列表失败：' + err.message
+    console.error('获取站点列表失败:', err)
+  } finally {
+    loading.value = false
   }
-])
+}
 
 // 检测延迟状态
 const testingSpeed = ref(false)
@@ -186,9 +261,20 @@ const getLatencyIcon = (latency) => {
   return 'mdi-alert'
 }
 
-// 页面加载时自动检测延迟
-onMounted(() => {
-  testAllMirrors()
+// 刷新数据
+const refreshData = async () => {
+  await fetchMirrorList()
+  if (mirrors.value.length > 0) {
+    testAllMirrors()
+  }
+}
+
+// 页面加载时自动获取站点列表并检测延迟
+onMounted(async () => {
+  await fetchMirrorList()
+  if (mirrors.value.length > 0) {
+    testAllMirrors()
+  }
 })
 </script>
 
