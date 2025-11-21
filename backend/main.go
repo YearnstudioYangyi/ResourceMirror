@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var mirrorList []string = []string{"https://yearnstudio.cdn.houlang.cloud/d/123-test", "https://resource.yearnstudio.cn/d/123pan/pan", "https://list.yearnstudio.cn/d/123pan/pan"}
+var mirrorList []string = []string{"https://yearnstudio.cdn.houlang.cloud/d/123-test", "https://resource.yearnstudio.cn/d/123pan/pan", "https://list.yearnstudio.cn/d/123pan/pan", "https://dl.yearnstudio.cn/1814376442/alist/%E5%88%86%E4%BA%AB%E7%94%A8"}
 
 // var mirrorDomain []string = []string{"https://yearnstudio.cdn.houlang.cloud", "https://resource.yearnstudio.cn", "https://list.yearnstudio.cn"}
 var mirrorDomain map[string]string = map[string]string{
@@ -63,7 +63,7 @@ func main() {
 	r.POST("/api/get", func(ctx *gin.Context) {
 		// 获取请求体
 		var reqBody struct {
-			URL string `json:"url"`
+			URL string `json:"url" binding:"required"`
 		} // 使用json标签令gin框架解析JSON中的url参数
 		if err := ctx.ShouldBindJSON(&reqBody); err != nil { // URL字段不存在
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
